@@ -98,6 +98,14 @@ https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6
 
 ## 改版履歴
 
+- **v1.01** (2024-06-19)
+
+  - 無駄な変数や初期化処理を削除．
+
+  - Convolution kernel の計算精度を少し向上．
+
+  - 無効なデータに対する対処で記述ミスがあったのを修正．
+
 - **v1.00** (2024-06-18)
 
   - 初版．
