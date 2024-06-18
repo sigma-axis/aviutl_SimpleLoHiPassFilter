@@ -4,7 +4,8 @@ AviUtl の拡張編集に「簡易ローパスハイパス」フィルタ効果�
 
 音声加工の手法自体は簡易的なものなので，凝ったのを誰か知識のある方が作ってくれるのを期待しています...
 
-TODO: video
+https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6396-d609-4fcf-9d11-1488e1cd4594
+
 
 ## 動作要件
 
@@ -28,9 +29,10 @@ TODO: video
 
 ## 使い方
 
-音声系オブジェクトのフィルタ効果の追加メニューとフィルタオブジェクトの追加メニューに「簡易ローパスハイパス」が追加されています．
+音声系オブジェクトのフィルタ効果の追加メニューとフィルタオブジェクトの追加メニューから「簡易ローパスハイパス」でフィルタを追加します．
 
-TODO: image of UI
+![GUI表示](https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/39de4d2f-4495-49dd-aa0e-c4ca253211e4)
+
 
 - `周波数` でカットオフ周波数を調整します．
 
