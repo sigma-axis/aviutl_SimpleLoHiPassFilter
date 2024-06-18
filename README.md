@@ -98,7 +98,7 @@ https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6
 
 ## 改版履歴
 
-- **v1.00** (2024-06-1?)
+- **v1.00** (2024-06-18)
 
   - 初版．
 
