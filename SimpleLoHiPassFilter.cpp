@@ -24,16 +24,11 @@ constinit struct ExEdit092 {
 	}
 	AviUtl::FilterPlugin* fp = nullptr;
 
-	HWND*	hwnd_setting_dlg;	// 0x1539c8
-
 	// called at: exedit_base + 0x1c1ea.
 	void*(*get_or_create_cache)(ExEdit::ObjectFilterIndex ofi, int w, int h, int bitcount, int v_func_id, int* old_cache_exists);
 
 	// 0x04a7e0
 	void(*update_any_exdata)(ExEdit::ObjectFilterIndex processing, const char* exdata_use_name);
-
-	// 0x08d150
-	void(*nextundo)();
 
 private:
 	void init_pointers(AviUtl::FilterPlugin* efp)
@@ -50,10 +45,7 @@ private:
 		};
 
 		pick_call_addr(get_or_create_cache,	0x01c1ea);
-		pick_addr(hwnd_setting_dlg,			0x1539c8);
-
 		pick_addr(update_any_exdata,		0x04a7e0);
-		pick_addr(nextundo,					0x08d150);
 	}
 } exedit{};
 
@@ -91,7 +83,7 @@ enum class ConvKernel : uint8_t {
 };
 constexpr int count_kernels = 6;
 
-#define PLUGIN_VERSION	"v1.00"
+#define PLUGIN_VERSION	"v1.01-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define FILTER_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define FILTER_INFO(name)	constexpr char filter_name[] = name, info[] = FILTER_INFO_FMT(name, PLUGIN_VERSION, PLUGIN_AUTHOR)
@@ -161,7 +153,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip);
 BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, AviUtl::EditHandle* editp, ExEdit::Filter* efp);
 int32_t func_window_init(HINSTANCE hinstance, HWND hwnd, int y, int base_id, int sw_param, ExEdit::Filter* efp);
 
-consteval ExEdit::Filter filter_info(ExEdit::Filter::Flag flag) {
+consteval ExEdit::Filter filter_info(ExEdit::Filter::Flag flag, bool do_init = true) {
 	return {
 		.flag = flag,
 		.name = const_cast<char*>(filter_name),
@@ -174,7 +166,7 @@ consteval ExEdit::Filter filter_info(ExEdit::Filter::Flag flag) {
 		.check_name = const_cast<char**>(check_names),
 		.check_default = const_cast<int*>(check_default),
 		.func_proc = &func_proc,
-		.func_init = [](ExEdit::Filter* efp) { exedit.init(efp->exedit_fp); return TRUE; },
+		.func_init = do_init ? [](ExEdit::Filter* efp) { exedit.init(efp->exedit_fp); return TRUE; } : nullptr,
 		.func_WndProc = &func_WndProc,
 		.exdata_size = sizeof(exdata_def),
 		.information = const_cast<char*>(info),
@@ -187,7 +179,7 @@ consteval ExEdit::Filter filter_info(ExEdit::Filter::Flag flag) {
 	};
 }
 inline constinit auto
-	filter = filter_info(ExEdit::Filter::Flag::Audio),
+	filter = filter_info(ExEdit::Filter::Flag::Audio, false),
 	effect = filter_info(ExEdit::Filter::Flag::Audio | ExEdit::Filter::Flag::Effect);
 
 
@@ -225,7 +217,7 @@ static void update_window_state(ExEdit::Filter* efp)
 	auto* exdata = reinterpret_cast<Exdata*>(efp->exdata_ptr);
 
 	// 「窓関数」のコンボボックスの項目選択.
-	if (int idx = static_cast<int>(exdata->kernel); 0 <= idx || idx < count_kernels) {
+	if (int idx = static_cast<int>(exdata->kernel); 0 <= idx && idx < count_kernels) {
 		::SendMessageA(efp->exfunc->get_hwnd(efp->processing, 6, idx_check::kernel), CB_SETCURSEL, idx, 0);
 	}
 
@@ -365,7 +357,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		set_size(1.0f);
 		auto const A = 1 / (0.50f * ker_func.size());
 		for (size_t i = 0; i < ker_func.size(); i++) {
-			auto v = 2.0f * i / ker_func.size();
+			auto v = 2 * (i + 0.5f) / ker_func.size();
 			ker_func[i] = A * (v < 1 ? v : 2 - v);
 		}
 		break;
@@ -377,7 +369,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		auto const A = 1 / (0.50f * ker_func.size()),
 			cf = 2 * pi / ker_func.size();
 		for (size_t i = 0; i < ker_func.size(); i++) {
-			ker_func[i] = A * (0.50f - 0.50f * std::cosf(cf * i));
+			ker_func[i] = A * (0.50f - 0.50f * std::cosf(cf * (i + 0.5f)));
 		}
 		break;
 	}
@@ -388,7 +380,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		auto const A = 1 / (0.54f * ker_func.size()),
 			cf = 2 * pi / ker_func.size();
 		for (size_t i = 0; i < ker_func.size(); i++) {
-			ker_func[i] = A * (0.54f - 0.46f * std::cosf(cf * i));
+			ker_func[i] = A * (0.54f - 0.46f * std::cosf(cf * (i + 0.5f)));
 		}
 		break;
 	}
@@ -400,8 +392,8 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 			cf = 2 * pi / ker_func.size();
 		for (size_t i = 0; i < ker_func.size(); i++) {
 			ker_func[i] = A * (0.42f
-				- 0.50f * std::cosf(cf * i)
-				+ 0.08f * std::cosf(2 * cf * i));
+				- 0.50f * std::cosf(cf * (i + 0.5f))
+				+ 0.08f * std::cosf(2 * cf * (i + 0.5f)));
 		}
 		break;
 	}
@@ -412,7 +404,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		set_size(2.0f);
 		auto const A = 4.0f / ker_func.size();
 		for (size_t i = 0; i < ker_func.size(); i++) {
-			float x = 4.0f * (i / (1.0f * ker_func.size()) - 0.5f);
+			float x = 4.0f * ((i + 0.5f) / ker_func.size() - 0.5f);
 			ker_func[i] = A * std::expf(-pi * x * x);
 		}
 		break;
