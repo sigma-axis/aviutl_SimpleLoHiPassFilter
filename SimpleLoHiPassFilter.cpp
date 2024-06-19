@@ -81,7 +81,7 @@ enum class ConvKernel : uint8_t {
 };
 constexpr int count_kernels = 6;
 
-#define PLUGIN_VERSION	"v1.03"
+#define PLUGIN_VERSION	"v1.04-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define FILTER_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define FILTER_INFO(name)	constexpr char filter_name[] = name, info[] = FILTER_INFO_FMT(name, PLUGIN_VERSION, PLUGIN_AUTHOR)
@@ -431,13 +431,13 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		latency = std::max<int>(efpip->audio_rate * raw_latency / (1000 * den_latency) - ((ker_func.size() - 1) >> 1), 0) * num_ch;
 	multi_thread([&](int thread_id, int thread_num) {
 		for (int i = thread_id; i < num_samples; i += thread_num) {
-			i16* const dst_buff = &data[i * num_ch]; // 書き込み先．
-			int const src_offset = i * num_ch - latency; // 対応する読み込み元．
+			int const dst_offset = i * num_ch, // 書き込み先．
+				src_offset = dst_offset - latency; // 対応する読み込み元．
 
 			for (int c = 0; c < num_ch; c++) {
 
 				// 畳み込み積分 ("強さ" が 100% でない場合の余剰分が和の初期値).
-				float sum = (1 - intensity) * dst_buff[c];
+				float sum = (1 - intensity) * efpip->audio_temp[dst_offset + c];
 				for (int j = ker_func.size(); --j >= 0;) {
 					int J = src_offset + c - j * num_ch;
 					auto src = J < 0 ? cache->data[(cache->offset + J) & (buffer_size - 1)] : efpip->audio_temp[J];
@@ -445,7 +445,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 				}
 
 				// 出力データに書き出し．
-				dst_buff[c] = static_cast<i16>(std::clamp<float>(sum,
+				data[dst_offset + c] = static_cast<i16>(std::clamp<float>(sum,
 					std::numeric_limits<i16>::min(), std::numeric_limits<i16>::max()));
 			}
 		}
