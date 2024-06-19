@@ -35,13 +35,11 @@ private:
 	{
 		fp = efp;
 
-		auto pick_addr = [exedit_base = reinterpret_cast<int32_t>(efp->dll_hinst), this]
+		auto pick_addr = [exedit_base = reinterpret_cast<intptr_t>(efp->dll_hinst), this]
 			<class T>(T& target, ptrdiff_t offset) { target = reinterpret_cast<T>(exedit_base + offset); };
 		auto pick_call_addr = [&]<class T>(T& target, ptrdiff_t offset) {
-			T* tmp; pick_addr(tmp, offset);
-			target = reinterpret_cast<T>(4 + 
-				reinterpret_cast<ptrdiff_t>(tmp) + 
-				reinterpret_cast<ptrdiff_t>(*tmp));
+			ptrdiff_t* tmp; pick_addr(tmp, offset);
+			target = reinterpret_cast<T>(4 + reinterpret_cast<intptr_t>(tmp) + *tmp);
 		};
 
 		pick_call_addr(get_or_create_cache,	0x01c1ea);
@@ -83,7 +81,7 @@ enum class ConvKernel : uint8_t {
 };
 constexpr int count_kernels = 6;
 
-#define PLUGIN_VERSION	"v1.01"
+#define PLUGIN_VERSION	"v1.02-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define FILTER_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define FILTER_INFO(name)	constexpr char filter_name[] = name, info[] = FILTER_INFO_FMT(name, PLUGIN_VERSION, PLUGIN_AUTHOR)
@@ -190,28 +188,14 @@ static void update_window_state(ExEdit::Filter* efp)
 {
 	/*
 	efp->exfunc->get_hwnd(efp->processing, i, j):
-		i = 0:
-			j 番目のスライダーの中央ボタン．
-
-		i = 1:
-			j 番目のスライダーの左トラックバー．
-
-		i = 2:
-			j 番目のスライダーの右トラックバー．
-
-		i = 3:
-			j 番目のチェック枠のチェックボックス．
-
-		i = 4:
-			j 番目のチェック枠のボタン．
-
-		i = 5, 7:
-			j 番目のチェック枠の右にある static (テキスト).
-
-		i = 6:
-			j 番目のチェック枠のコンボボックス．
-
-		i > 6 -> nullptr.
+		i = 0:		j 番目のスライダーの中央ボタン．
+		i = 1:		j 番目のスライダーの左トラックバー．
+		i = 2:		j 番目のスライダーの右トラックバー．
+		i = 3:		j 番目のチェック枠のチェックボックス．
+		i = 4:		j 番目のチェック枠のボタン．
+		i = 5, 7:	j 番目のチェック枠の右にある static (テキスト).
+		i = 6:		j 番目のチェック枠のコンボボックス．
+		otherwise -> nullptr.
 	*/
 
 	auto* exdata = reinterpret_cast<Exdata*>(efp->exdata_ptr);
@@ -283,8 +267,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		volume = raw_volume / (20.0f * den_volume);
 
 	int constexpr
-		max_window_size = 2 * (track_max[idx_track::latency] / den_latency), // 畳み込み積の幅の最大想定 (ミリ秒).
-		min_inv_speed = 4;
+		max_window_len = 2 * (track_max[idx_track::latency] / den_latency); // 畳み込み積の幅の最大想定 (ミリ秒).
 
 	// 過去音声データを保存するキャッシュを取得．ほとんどエコーフィルタ効果のソースのコピー．
 	// https://github.com/nazonoSAUNA/Echo.eef/blob/main/src.cpp
@@ -294,9 +277,9 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		int frame;
 		i16 data[1];
 	}* cache;
-	int const buffer_size = std::bit_ceil(std::clamp<uint32_t>(
-		efpip->audio_ch * efpip->audio_rate * max_window_size / 1000 * min_inv_speed,
-		0x1'0000, 0x800'0000));
+	int const max_window_size = efpip->audio_rate * max_window_len / 1000 + 1,
+		buffer_size = std::bit_ceil(std::clamp<uint32_t>(
+			2 * max_window_size * efpip->audio_ch, 0x1000, 0x800'0000));
 	int cache_exists_flag;
 	cache = reinterpret_cast<decltype(cache)>(exedit.get_or_create_cache(
 		efp->processing, buffer_size + (offsetof(std::decay_t<decltype(*cache)>, data) / sizeof(i16)), 1, 8 * sizeof(i16),
@@ -304,31 +287,35 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 
 	if (cache == nullptr) return TRUE; // キャッシュを取得できなかった場合何もしない．
 
-	int const frame = efpip->frame + efpip->add_frame;
-	if (frame == 0 || frame < cache->frame || cache_exists_flag == 0) {
-		// 新規キャッシュなら初期化．
+	if (int const frame = efpip->frame + efpip->add_frame;
+		frame == 0 || frame < cache->frame || cache_exists_flag == 0) {
+		// 新規キャッシュ，あるいは時間が巻き戻っているなら初期化．
 		cache->offset = 0;
-		cache->frame = -1;
+		cache->frame = 0;
 		std::memset(cache->data, 0, buffer_size * sizeof(i16));
 	}
-	if (cache->frame == frame) {
+	else if (cache->frame == frame) {
 		// 同一フレームなので音声ソースの更新．書き込み場所を巻き戻す．
-		cache->offset -= efpip->audio_n * efpip->audio_ch;
+		cache->offset -= std::min(max_window_size, efpip->audio_n) * efpip->audio_ch;
 		cache->offset &= (buffer_size - 1);
 	}
 	else cache->frame = frame;
 
-	// 音声データのポインタ取得．
-	auto const data = efp == &effect ? efpip->audio_data : efpip->audio_p;
+	// キャッシュへ元音声の末尾データを追記するラムダ．
+	auto push_cache = [&](i16 const* src) {
+		int L = std::min(max_window_size, efpip->audio_n) * efpip->audio_ch,
+			i0 = efpip->audio_n * efpip->audio_ch - L;
+		for (int i = 0; i < L; i++) {
+			cache->data[cache->offset] = src[i + i0];
+			cache->offset = (cache->offset + 1) & (buffer_size - 1);
+		}
+	};
 
-	// 音声データをキャッシュに保存．
-	for (int i = 0, L = efpip->audio_n * efpip->audio_ch; i < L; i++) {
-		cache->data[cache->offset] = data[i];
-		cache->offset = (cache->offset + 1) & (buffer_size - 1);
+	// 強さ 0 の場合はキャッシュの更新だけして音声加工の必要なし．
+	if (intensity <= 0) {
+		push_cache(efp == &effect ? efpip->audio_data : efpip->audio_p);
+		return TRUE;
 	}
-
-	// キャッシュの保存をしたなら強さ 0 の場合は音声加工の必要なし．
-	if (intensity <= 0) return TRUE;
 
 	// 計算に必要なサンプル数をおおまかに計算．
 	float const freq = 440.0f * std::exp2f(raw_freq / (12.0f * den_freq)), // 440Hz A を基準．
@@ -363,6 +350,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		break;
 	}
 	case ConvKernel::Hann:
+	default:
 	{
 		// Hann.
 		set_size(1.0f);
@@ -398,7 +386,6 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		break;
 	}
 	case ConvKernel::Gaussian:
-	default:
 	{
 		// ガウスぼかし．
 		set_size(2.0f);
@@ -414,7 +401,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 	// ハイパスフィルタへ転換（Dirac δ との補数をとるだけ）．
 	if (hipass) {
 		for (auto& v : ker_func) v *= -1;
-		ker_func[ker_func.size() / 2] += 1;
+		ker_func[(ker_func.size() - 1) >> 1] += 1;
 	}
 
 	// "強さ" と "補正dB" の加味．
@@ -423,18 +410,29 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		for (auto& v : ker_func) v *= rate;
 	}
 
+	// 元音声データを一旦退避，書き込み先を取得．ここ以降，元音声の参照先は efpip->audio_temp.
+	i16* data;
+	if (efp == &effect) {
+		std::swap(efpip->audio_data, efpip->audio_temp);
+		data = efpip->audio_data;
+	}
+	else {
+		std::memcpy(efpip->audio_temp, efpip->audio_p,
+			sizeof(i16) * efpip->audio_n * efpip->audio_ch);
+		data = efpip->audio_p;
+	}
+
 	// 畳み込みの計算．
 	int const num_samples = efpip->audio_n, num_ch = efpip->audio_ch,
-		length = num_samples * num_ch,
 		// 既知の問題:
 		// 「周波数」を時間的に変化させるとプツプツノイズが入る．
 		// ピークに対応するサンプル位置が func_proc() ごとに不連続に飛んでしまうのが理由の模様．
 		// ->「最小遅延」のパラメタ調整で抑えることにした．
-		latency = std::max<int>(efpip->audio_rate * raw_latency / (1000 * den_latency) - ker_func.size() / 2, 0) * num_ch;
+		latency = std::max<int>(efpip->audio_rate * raw_latency / (1000 * den_latency) - ((ker_func.size() - 1) >> 1), 0) * num_ch;
 	multi_thread([&](int thread_id, int thread_num) {
 		for (int i = thread_id; i < num_samples; i += thread_num) {
 			i16* const dst_buff = &data[i * num_ch]; // 書き込み先．
-			int const src_offset = i * num_ch + cache->offset - length - latency; // 対応する読み込み元．
+			int const src_offset = i * num_ch - latency; // 対応する読み込み元．
 
 			for (int c = 0; c < num_ch; c++) {
 
@@ -442,7 +440,8 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 				float sum = (1 - intensity) * dst_buff[c];
 				for (int j = ker_func.size(); --j >= 0;) {
 					int J = src_offset + c - j * num_ch;
-					sum = std::fmaf(cache->data[J & (buffer_size - 1)], ker_func[j], sum);
+					auto src = J < 0 ? cache->data[(cache->offset + J) & (buffer_size - 1)] : efpip->audio_temp[J];
+					sum = std::fmaf(src, ker_func[j], sum);
 				}
 
 				// 出力データに書き出し．
@@ -451,6 +450,9 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 			}
 		}
 	});
+
+	// キャッシュを更新．
+	push_cache(efpip->audio_temp);
 
 	return TRUE;
 }
