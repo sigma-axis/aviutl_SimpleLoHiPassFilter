@@ -73,7 +73,7 @@ https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6
   次の 6 つから選びます．
 
   1.  矩形窓: $\qquad f(x)=1\quad(-1\leqq x \leqq +1)$.
-  1.  三角窓: $\qquad f(x)=\min\{ 1+x, 1-x \}$.
+  1.  三角窓: $\qquad f(x)=\min\\{ 1+x, 1-x \\}$.
   1.  Hann 窓: $\qquad f(x)=0.5+0.5\cos \pi x$.
   1.  Hamming 窓: $\qquad f(x)=0.52+0.46\cos \pi x$.
   1.  Blackman 窓: $\qquad f(x)=0.42+0.50\cos \pi x+0.08\cos 2\pi x$.
@@ -97,6 +97,12 @@ https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6
 
 
 ## 改版履歴
+
+- **v1.02** (2024-06-19)
+
+  - バッファの取り回しを間違っていたのを修正．ソースのコピー元でバッファが長めの最低保証を受けていたため不具合が起こらなかっただけだった．
+
+  - 小さなコード修正．
 
 - **v1.01** (2024-06-19)
 
