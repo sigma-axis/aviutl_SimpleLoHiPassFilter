@@ -81,7 +81,7 @@ enum class ConvKernel : uint8_t {
 };
 constexpr int count_kernels = 6;
 
-#define PLUGIN_VERSION	"v1.02"
+#define PLUGIN_VERSION	"v1.03"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define FILTER_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define FILTER_INFO(name)	constexpr char filter_name[] = name, info[] = FILTER_INFO_FMT(name, PLUGIN_VERSION, PLUGIN_AUTHOR)
@@ -291,7 +291,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 		frame == 0 || frame < cache->frame || cache_exists_flag == 0) {
 		// 新規キャッシュ，あるいは時間が巻き戻っているなら初期化．
 		cache->offset = 0;
-		cache->frame = 0;
+		cache->frame = frame;
 		std::memset(cache->data, 0, buffer_size * sizeof(i16));
 	}
 	else if (cache->frame == frame) {
