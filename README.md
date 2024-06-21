@@ -75,11 +75,12 @@ https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6
   1.  矩形窓: $\qquad f(x)=1\quad(-1\leqq x \leqq +1)$.
   1.  三角窓: $\qquad f(x)=\min\\{ 1+x, 1-x \\}$.
   1.  Hann 窓: $\qquad f(x)=0.5+0.5\cos \pi x$.
-  1.  Hamming 窓: $\qquad f(x)=0.52+0.46\cos \pi x$.
+  1.  Hamming 窓: $\qquad f(x)=0.54+0.46\cos \pi x$.
   1.  Blackman 窓: $\qquad f(x)=0.42+0.50\cos \pi x+0.08\cos 2\pi x$.
   1.  Gauss 窓: $\qquad f(x)=\exp(-\pi x^2)$.
 
   初期値は Hann 窓です．
+
 
 ## TIPS
 
@@ -90,6 +91,7 @@ https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6
 - 遅延量の最大想定の約 40 ミリ秒（0.04 秒）は，`周波数` を最小の `-24.00` と想定しての値です．1オクターブ上がるごとに必要最小限の遅延量は半分になるため，本当に最大想定が必要な場面は多くないと思われます．また，`最小遅延` で指定した遅延時間だけ音声オブジェクトを前倒しにして配置すれば，遅延の影響を打ち消すことができます．
 
 - `周波数` を時間変化させない場合は `最小遅延` を `0` に指定すれば，遅延量は計算手順上の必要最小限になってくれます．
+
 
 ## 既知の問題
 
