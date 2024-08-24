@@ -51,12 +51,12 @@ private:
 ////////////////////////////////
 // マルチスレッド関数のラッパー．
 ////////////////////////////////
-constexpr auto multi_thread = [](auto&& func) {
+static inline void multi_thread(auto&& func) {
 	exedit.fp->exfunc->exec_multi_thread_func([](int thread_id, int thread_num, void* param1, void* param2) {
 		auto pfunc = reinterpret_cast<decltype(&func)>(param1);
 		(*pfunc)(thread_id, thread_num);
 	}, &func, nullptr);
-};
+}
 
 
 ////////////////////////////////
@@ -81,7 +81,7 @@ enum class ConvKernel : uint8_t {
 };
 constexpr int count_kernels = 6;
 
-#define PLUGIN_VERSION	"v1.04"
+#define PLUGIN_VERSION	"v1.05-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define FILTER_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define FILTER_INFO(name)	constexpr char filter_name[] = name, info[] = FILTER_INFO_FMT(name, PLUGIN_VERSION, PLUGIN_AUTHOR)
@@ -184,7 +184,7 @@ inline constinit auto
 ////////////////////////////////
 // ウィンドウ状態の保守．
 ////////////////////////////////
-static void update_window_state(ExEdit::Filter* efp)
+static inline void update_window_state(ExEdit::Filter* efp)
 {
 	/*
 	efp->exfunc->get_hwnd(efp->processing, i, j):
@@ -234,7 +234,7 @@ BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, AviUtl:
 		}
 		break;
 	}
-	return TRUE;
+	return FALSE;
 }
 
 int32_t func_window_init(HINSTANCE hinstance, HWND hwnd, int y, int base_id, int sw_param, ExEdit::Filter* efp)
@@ -445,8 +445,8 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 				}
 
 				// 出力データに書き出し．
-				data[dst_offset + c] = static_cast<i16>(std::clamp<float>(sum,
-					std::numeric_limits<i16>::min(), std::numeric_limits<i16>::max()));
+				data[dst_offset + c] = static_cast<i16>(std::lround(std::clamp<float>(sum,
+					std::numeric_limits<i16>::min(), std::numeric_limits<i16>::max())));
 			}
 		}
 	});
