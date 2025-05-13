@@ -81,7 +81,7 @@ enum class ConvKernel : uint8_t {
 };
 constexpr int count_kernels = 6;
 
-#define PLUGIN_VERSION	"v1.05"
+#define PLUGIN_VERSION	"v1.06-beta1"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define FILTER_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define FILTER_INFO(name)	constexpr char filter_name[] = name, info[] = FILTER_INFO_FMT(name, PLUGIN_VERSION, PLUGIN_AUTHOR)
@@ -283,7 +283,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 	int cache_exists_flag;
 	cache = reinterpret_cast<decltype(cache)>(exedit.get_or_create_cache(
 		efp->processing, buffer_size + (offsetof(std::decay_t<decltype(*cache)>, data) / sizeof(i16)), 1, 8 * sizeof(i16),
-		efpip->v_func_idx, &cache_exists_flag));
+		0, &cache_exists_flag));
 
 	if (cache == nullptr) return TRUE; // キャッシュを取得できなかった場合何もしない．
 
