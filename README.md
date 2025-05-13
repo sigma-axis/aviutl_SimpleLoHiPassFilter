@@ -100,6 +100,12 @@ https://github.com/sigma-axis/aviutl_SimpleLoHiPassFilter/assets/132639613/5cbe6
 
 ## 改版履歴
 
+- **v1.06** (2025-05-14)
+
+  - [音声クロスフェード](https://github.com/nazonoSAUNA/AudioCrossFade.eef)オブジェクトと組み合わせても正しく動作するように修正．
+
+  - 「シーン(音声)」オブジェクト経由でスロー再生した場合ノイズが混じっていたのを修正．
+
 - **v1.05** (2024-08-24)
 
   - 一部不必要な更新を抑制．
