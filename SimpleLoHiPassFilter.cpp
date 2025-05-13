@@ -81,7 +81,7 @@ enum class ConvKernel : uint8_t {
 };
 constexpr int count_kernels = 6;
 
-#define PLUGIN_VERSION	"v1.06-beta1"
+#define PLUGIN_VERSION	"v1.06-beta2"
 #define PLUGIN_AUTHOR	"sigma-axis"
 #define FILTER_INFO_FMT(name, ver, author)	(name##" "##ver##" by "##author)
 #define FILTER_INFO(name)	constexpr char filter_name[] = name, info[] = FILTER_INFO_FMT(name, PLUGIN_VERSION, PLUGIN_AUTHOR)
@@ -274,7 +274,7 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 	using i16 = int16_t;
 	struct {
 		int offset;
-		int frame;
+		int milliframe;
 		i16 data[1];
 	}* cache;
 	int const max_window_size = efpip->audio_rate * max_window_len / 1000 + 1,
@@ -287,19 +287,32 @@ BOOL func_proc(ExEdit::Filter* efp, ExEdit::FilterProcInfo* efpip)
 
 	if (cache == nullptr) return TRUE; // キャッシュを取得できなかった場合何もしない．
 
-	if (int const frame = efpip->frame + efpip->add_frame;
-		frame == 0 || frame < cache->frame || cache_exists_flag == 0) {
-		// 新規キャッシュ，あるいは時間が巻き戻っているなら初期化．
+	int milliframe = 1000 * (efpip->frame + efpip->add_frame);
+	bool is_head = false;
+	if (efpip->audio_speed != 0) {
+		milliframe = efpip->audio_milliframe - 1000 * (efpip->frame_num - efpip->frame);
+		auto const
+			speed = 0.000'001 * efpip->audio_speed,
+			frame = 0.001 * milliframe;
+
+		if (speed >= 0 ? frame - speed < 0 : frame - speed >= efpip->frame_n) // 想定の前回描画フレームが範囲外．
+			is_head = true;
+	}
+	else if (milliframe == 0) // 1フレーム目
+		is_head = true;
+
+	if (is_head || milliframe < cache->milliframe || cache_exists_flag == 0) {
+		// 冒頭部，新規キャッシュ，あるいは時間が巻き戻っているなら初期化．
 		cache->offset = 0;
-		cache->frame = frame;
+		cache->milliframe = milliframe;
 		std::memset(cache->data, 0, buffer_size * sizeof(i16));
 	}
-	else if (cache->frame == frame) {
+	else if (cache->milliframe == milliframe) {
 		// 同一フレームなので音声ソースの更新．書き込み場所を巻き戻す．
 		cache->offset -= std::min(max_window_size, efpip->audio_n) * efpip->audio_ch;
 		cache->offset &= (buffer_size - 1);
 	}
-	else cache->frame = frame;
+	else cache->milliframe = milliframe;
 
 	// キャッシュへ元音声の末尾データを追記するラムダ．
 	auto push_cache = [&](i16 const* src) {
